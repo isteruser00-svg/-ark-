@@ -25,7 +25,7 @@
   }
   button:active { transform: scale(0.97); }
   #kelime {
-    flex: 1; display: flex; flex-direction: column; align-items: center;
+    display: flex; flex-direction: column; align-items: center;
     justify-content: center; text-align: center; min-height: 160px;
   }
   #gosterim {
@@ -37,7 +37,7 @@
     width: 100%; padding: 28px; font-size: 22px; font-weight: 700;
     background: #7aa2f7; color: #111; border-radius: 16px;
   }
-  #bilgi { font-size: 13px; color: #888; }
+  #bilgi { font-size: 13px; color: #888; word-break: break-word; }
 </style>
 </head>
 <body>
@@ -49,9 +49,10 @@
   <button id="hazirla">Sözleri Hazırla</button>
   <button id="muzikSec">Müzik Seç</button>
   <button id="calDurdur">▶ Çal</button>
+  <button id="sonrakiParca">⏭ Sonraki Parça</button>
 </div>
-<input type="file" id="dosya" accept="audio/*" hidden>
-<div id="bilgi">Müzik seçilmedi</div>
+<input type="file" id="dosya" accept="audio/*" multiple hidden>
+<div id="bilgi">Yükleniyor...</div>
 
 <div id="kelime">
   <div id="gosterim">—</div>
@@ -64,9 +65,12 @@
   <button id="basa">↺ Başa Dön</button>
 </div>
 
-<audio id="ses"></audio>
+<audio id="ses" preload="auto"></audio>
 
 <script>
+  // Repodaki şarkının adı (tam olarak böyle yazılmalı)
+  const REPO_SARKI = "MODEL - Ölürüm Daha İyi(_zDe4b5l5oek_).m4a";
+
   const sozlerEl = document.getElementById("sozler");
   const gosterimEl = document.getElementById("gosterim");
   const sayacEl = document.getElementById("sayac");
@@ -78,6 +82,11 @@
   let kelimeler = [];
   let idx = 0;
 
+  // Çalma listesi: { name, url }
+  let liste = [];
+  let parca = 0;
+
+  // ---------- Kelime bölümü ----------
   function guncelle(kelime) {
     gosterimEl.textContent = kelime ?? "—";
     sayacEl.textContent = `${idx} / ${kelimeler.length}`;
@@ -86,8 +95,15 @@
   function seslendir(kelime) {
     if (!("speechSynthesis" in window)) return;
     speechSynthesis.cancel();
+
     const u = new SpeechSynthesisUtterance(kelime);
     u.lang = "tr-TR";
+    u.rate = 0.9;
+
+    // Kelime okunurken şarkıyı kıs, bitince geri aç
+    ses.volume = 0.2;
+    u.onend = () => { ses.volume = 1; };
+    u.onerror = () => { ses.volume = 1; };
     speechSynthesis.speak(u);
   }
 
@@ -126,23 +142,49 @@
     guncelle();
   };
 
+  // ---------- Müzik bölümü ----------
+  function parcaYukle(i, otomatikBaslat = true) {
+    if (liste.length === 0) return;
+    parca = (i + liste.length) % liste.length;
+    ses.src = liste[parca].url;
+    bilgiEl.textContent = `${parca + 1}/${liste.length}: ${liste[parca].name}`;
+    if (otomatikBaslat) {
+      ses.play().catch(() => {});
+      calBtn.textContent = "❚❚ Durdur";
+    } else {
+      calBtn.textContent = "▶ Çal";
+    }
+  }
+
+  // Sayfa açılınca repodaki şarkıyı listeye ekle (otomatik çalmaz)
+  liste = [{ name: REPO_SARKI, url: encodeURI(REPO_SARKI) }];
+  parcaYukle(0, false);
+
+  ses.onerror = () => {
+    bilgiEl.textContent =
+      "Şarkı yüklenemedi. Dosya adı repoda tam olarak aynı mı kontrol edin.";
+  };
+
   document.getElementById("muzikSec").onclick = () => dosya.click();
 
   dosya.onchange = () => {
-    const f = dosya.files[0];
-    if (!f) return;
-    ses.src = URL.createObjectURL(f);
-    bilgiEl.textContent = f.name;
-    calBtn.textContent = "▶ Çal";
+    const secilen = Array.from(dosya.files);
+    if (secilen.length === 0) return;
+    liste = secilen.map(f => ({
+      name: f.name,
+      url: URL.createObjectURL(f)
+    }));
+    parcaYukle(0);
   };
 
+  // Parça bitince sıradakine geç
+  ses.onended = () => parcaYukle(parca + 1);
+
+  document.getElementById("sonrakiParca").onclick = () => parcaYukle(parca + 1);
+
   calBtn.onclick = () => {
-    if (!ses.src) {
-      alert("Önce bir müzik dosyası seçin.");
-      return;
-    }
     if (ses.paused) {
-      ses.play();
+      ses.play().catch(() => alert("Şarkı çalınamadı. Sayfayı yenileyip tekrar deneyin."));
       calBtn.textContent = "❚❚ Durdur";
     } else {
       ses.pause();
