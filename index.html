@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kelime Kelime Şarkı</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, sans-serif;
+    background: #1e1e2e; color: #eee;
+    min-height: 100vh; display: flex; flex-direction: column;
+    padding: 16px; gap: 14px;
+  }
+  h2 { margin: 0; font-size: 18px; }
+  textarea {
+    width: 100%; height: 120px; border-radius: 10px; border: none;
+    padding: 10px; font-size: 16px; background: #2a2a3d; color: #eee;
+    resize: vertical;
+  }
+  .satir { display: flex; gap: 8px; flex-wrap: wrap; }
+  button {
+    border: none; border-radius: 10px; padding: 12px 14px;
+    font-size: 15px; background: #3d3d5c; color: #eee; cursor: pointer;
+  }
+  button:active { transform: scale(0.97); }
+  #kelime {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center; min-height: 160px;
+  }
+  #gosterim {
+    font-size: 42px; font-weight: 700; word-break: break-word;
+    color: #fff; min-height: 60px;
+  }
+  #sayac { color: #888; margin-top: 8px; }
+  #sonraki {
+    width: 100%; padding: 28px; font-size: 22px; font-weight: 700;
+    background: #7aa2f7; color: #111; border-radius: 16px;
+  }
+  #bilgi { font-size: 13px; color: #888; }
+</style>
+</head>
+<body>
+
+<h2>Şarkı sözlerini yapıştır</h2>
+<textarea id="sozler" placeholder="Şarkı sözlerini buraya yapıştır..."></textarea>
+
+<div class="satir">
+  <button id="hazirla">Sözleri Hazırla</button>
+  <button id="muzikSec">Müzik Seç</button>
+  <button id="calDurdur">▶ Çal</button>
+</div>
+<input type="file" id="dosya" accept="audio/*" hidden>
+<div id="bilgi">Müzik seçilmedi</div>
+
+<div id="kelime">
+  <div id="gosterim">—</div>
+  <div id="sayac">0 / 0</div>
+</div>
+
+<button id="sonraki">SONRAKİ KELİME ▶</button>
+<div class="satir">
+  <button id="onceki">◀ Önceki</button>
+  <button id="basa">↺ Başa Dön</button>
+</div>
+
+<audio id="ses"></audio>
+
+<script>
+  const sozlerEl = document.getElementById("sozler");
+  const gosterimEl = document.getElementById("gosterim");
+  const sayacEl = document.getElementById("sayac");
+  const bilgiEl = document.getElementById("bilgi");
+  const calBtn = document.getElementById("calDurdur");
+  const ses = document.getElementById("ses");
+  const dosya = document.getElementById("dosya");
+
+  let kelimeler = [];
+  let idx = 0;
+
+  function guncelle(kelime) {
+    gosterimEl.textContent = kelime ?? "—";
+    sayacEl.textContent = `${idx} / ${kelimeler.length}`;
+  }
+
+  function seslendir(kelime) {
+    if (!("speechSynthesis" in window)) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(kelime);
+    u.lang = "tr-TR";
+    speechSynthesis.speak(u);
+  }
+
+  document.getElementById("hazirla").onclick = () => {
+    kelimeler = sozlerEl.value.trim().split(/\s+/).filter(Boolean);
+    idx = 0;
+    guncelle();
+  };
+
+  document.getElementById("sonraki").onclick = () => {
+    if (kelimeler.length === 0) {
+      document.getElementById("hazirla").click();
+      if (kelimeler.length === 0) return;
+    }
+    if (idx >= kelimeler.length) {
+      gosterimEl.textContent = "Bitti ✓";
+      return;
+    }
+    const kelime = kelimeler[idx];
+    idx++;
+    guncelle(kelime);
+    seslendir(kelime);
+  };
+
+  document.getElementById("onceki").onclick = () => {
+    if (idx > 1) {
+      idx -= 2;
+      document.getElementById("sonraki").click();
+    } else {
+      document.getElementById("basa").click();
+    }
+  };
+
+  document.getElementById("basa").onclick = () => {
+    idx = 0;
+    guncelle();
+  };
+
+  document.getElementById("muzikSec").onclick = () => dosya.click();
+
+  dosya.onchange = () => {
+    const f = dosya.files[0];
+    if (!f) return;
+    ses.src = URL.createObjectURL(f);
+    bilgiEl.textContent = f.name;
+    calBtn.textContent = "▶ Çal";
+  };
+
+  calBtn.onclick = () => {
+    if (!ses.src) {
+      alert("Önce bir müzik dosyası seçin.");
+      return;
+    }
+    if (ses.paused) {
+      ses.play();
+      calBtn.textContent = "❚❚ Durdur";
+    } else {
+      ses.pause();
+      calBtn.textContent = "▶ Çal";
+    }
+  };
+
+  guncelle();
+</script>
+</body>
+</html>
